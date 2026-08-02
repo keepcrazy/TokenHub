@@ -168,6 +168,7 @@ func (a CodexSubscriptionAdapter) openResponsesWithCredentials(ctx context.Conte
 	if strings.EqualFold(strings.TrimSpace(request.ServiceTier), "fast") {
 		request.ServiceTier = "priority"
 	}
+	request = withoutUnsupportedCodexGenerationControls(request)
 	applyCodexRequestEnvelope(&request, incoming)
 	payload, err := json.Marshal(request)
 	if err != nil {
@@ -203,6 +204,17 @@ func (a CodexSubscriptionAdapter) openResponsesWithCredentials(ctx context.Conte
 	}
 	resp.Body = newIdleTimeoutReadCloser(resp.Body, openAICodexStreamIdleTimeout)
 	return resp, nil
+}
+
+func withoutUnsupportedCodexGenerationControls(request ResponsesRequest) ResponsesRequest {
+	request.MaxTokens = 0
+	request.Temperature = nil
+	if request.raw != nil {
+		request.raw = cloneRawJSON(request.raw, 0)
+		delete(request.raw, "max_output_tokens")
+		delete(request.raw, "temperature")
+	}
+	return request
 }
 
 type idleTimeoutReadCloser struct {
