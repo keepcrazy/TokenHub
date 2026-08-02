@@ -7852,7 +7852,7 @@ func bearerToken(r *http.Request) string {
 
 func decodeJSON(r *http.Request, target any) error {
 	defer r.Body.Close()
-	const maxRequestBodyBytes = 4 << 20
+	const maxRequestBodyBytes = 128 << 20
 	data, err := io.ReadAll(io.LimitReader(r.Body, maxRequestBodyBytes+1))
 	if err != nil {
 		return err
