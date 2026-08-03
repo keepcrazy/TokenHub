@@ -73,7 +73,7 @@ func NewWithConfig(store Store, config Config) *Server {
 		config.ImageCapabilityRetrySecs = 86400
 	}
 	imageContext, imageCancel := context.WithCancel(context.Background())
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := &http.Client{Timeout: 10 * time.Minute}
 	codexClient := &http.Client{}
 	openai := OpenAICompatibleAdapter{Client: client}
 	codexSubscription := &CodexSubscriptionAdapter{
