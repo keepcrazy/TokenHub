@@ -335,22 +335,7 @@ export function quotaSummaryPart(quota: AdminResource, key: string, label: strin
 }
 
 export function projectQuotaIssue(data: AppData, project: Project) {
-  const quotaLogs = data.logs.filter(
-    (log) => log.project_id === project.id && (log.error_code === "quota_exceeded" || log.status_code === 429),
-  );
-  const quotaAlerts = data.alerts.filter((alert) => {
-    const code = String(alert.code || "").toLowerCase();
-    if (!code.includes("quota")) return false;
-    if (alert.scope_type === "project" && alert.scope_id === project.id) return true;
-    return alert.scope_id === project.id;
-  });
-  const count = quotaLogs.length + quotaAlerts.length;
-  if (count === 0) return null;
-  const latest = [...quotaLogs.map((log) => log.created_at), ...quotaAlerts.map((alert) => alert.created_at)]
-    .filter(Boolean)
-    .sort()
-    .at(-1);
-  return { count, latest };
+  return data.logs.some((log) => log.project_id === project.id && log.error_code === "quota_exceeded");
 }
 
 export function pendingProjectQuotaApproval(data: AppData, project: Project) {

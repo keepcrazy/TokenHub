@@ -5418,7 +5418,77 @@ func (s *Server) handleAdminRequestLogs(w http.ResponseWriter, r *http.Request) 
 		writeError(w, r, NewHTTPError(405, "method_not_allowed", "Method not allowed"))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": s.filterRequestLogsForUser(user, s.store.ListRequestLogs())})
+	query, err := parseRequestLogQuery(r)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	query.AllowGlobal = s.canViewGlobalOperations(user)
+	if !query.AllowGlobal {
+		query.TeamLeader = normalizeAdminRole(user.Role) == "team_leader"
+		query.VisibleProjectIDs = sortedStringSet(s.visibleProjectIDSet(user))
+		query.VisibleAPIKeyIDs = sortedStringSet(s.visibleAPIKeyIDSet(user))
+	}
+	result, err := s.store.QueryRequestLogs(query)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	totalPages := int((result.Total + int64(query.PageSize) - 1) / int64(query.PageSize))
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": result.Data,
+		"pagination": map[string]any{
+			"page":        query.Page,
+			"page_size":   query.PageSize,
+			"total":       result.Total,
+			"total_pages": totalPages,
+		},
+		"summary": result.Summary,
+	})
+}
+
+func parseRequestLogQuery(r *http.Request) (RequestLogQuery, error) {
+	values := r.URL.Query()
+	query := RequestLogQuery{Page: 1, PageSize: 100, Status: "all", Query: strings.TrimSpace(values.Get("q"))}
+	for _, item := range []struct {
+		name   string
+		target *int
+	}{
+		{name: "page", target: &query.Page},
+		{name: "page_size", target: &query.PageSize},
+	} {
+		if _, present := values[item.name]; !present {
+			continue
+		}
+		parsed, err := strconv.Atoi(values.Get(item.name))
+		if err != nil || parsed <= 0 || (item.name == "page_size" && parsed > 100) {
+			message := item.name + " must be a positive integer"
+			if item.name == "page_size" {
+				message += " no greater than 100"
+			}
+			return RequestLogQuery{}, NewHTTPError(http.StatusBadRequest, "invalid_request", message)
+		}
+		*item.target = parsed
+	}
+	if query.Page > int(^uint(0)>>1)/query.PageSize {
+		return RequestLogQuery{}, NewHTTPError(http.StatusBadRequest, "invalid_request", "page and page_size are too large")
+	}
+	if _, present := values["status"]; present {
+		query.Status = strings.ToLower(strings.TrimSpace(values.Get("status")))
+	}
+	if query.Status != "all" && query.Status != "ok" && query.Status != "error" {
+		return RequestLogQuery{}, NewHTTPError(http.StatusBadRequest, "invalid_request", "status must be all, ok, or error")
+	}
+	return query, nil
+}
+
+func sortedStringSet(values map[string]bool) []string {
+	items := make([]string, 0, len(values))
+	for value := range values {
+		items = append(items, value)
+	}
+	sort.Strings(items)
+	return items
 }
 
 func (s *Server) handleAdminRequestDetail(w http.ResponseWriter, r *http.Request) {

@@ -1084,11 +1084,11 @@ export function ProjectQuotaPanel({
         {quotaIssue || pendingApproval ? (
           <div className="quota-request-banner">
             <div>
-              <strong>{pendingApproval ? tx("已有额度提升申请待审批") : tx("最近触发了项目额度限制")}</strong>
+              <strong>{pendingApproval ? tx("已有额度提升申请待审批") : tx("近期有请求触发额度限制")}</strong>
               <span>
                 {pendingApproval
                   ? `${approvalTriggerLabel(pendingApproval.trigger)} ${pendingApproval.id}，${tx("可在审批记录中处理。")}`
-                  : `${formatNumber(quotaIssue?.count ?? 0)} ${tx("次额度不足，请填写希望提升后的目标额度再提交审批。")}`}
+                  : tx("最近 100 条可见请求中，该项目下有请求触发额度限制；请先核对 Key 与项目额度，再提交相应调整。")}
               </span>
             </div>
             {pendingApproval ? <StatusPill status="pending" label="待审批" /> : <StatusPill status="warning" label="需提升" />}

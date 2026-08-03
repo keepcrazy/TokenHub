@@ -462,7 +462,7 @@ export function gatewayEnglishLLMUsageDocs(stats: GatewayDocStats, role: AppRole
                 ["403", "Project, key, or model permission does not allow the request.", teamLeader ? "Check project membership, key model scope, and team project ownership." : "Ask your team leader to check project membership and model access."],
                 ["404/503", "No enabled healthy route can serve the model.", "Ask an administrator to enable routing or check provider health."],
                 ["429", "Project quota, concurrency, or provider resource limit was reached.", teamLeader ? "Review project quota and concurrency limits." : "Wait for quota reset or request a quota increase."],
-                ["500", "Upstream provider or routing error.", `Search request_id in Request Logs. Current visible log sample: ${formatNumber(stats.requestLogCount)}.`],
+                ["500", "Upstream provider or routing error.", `Search request_id in Request Logs. Visible billable request total: ${formatNumber(stats.requestLogCount)}.`],
               ],
             },
           },

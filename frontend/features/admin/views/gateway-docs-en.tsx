@@ -214,7 +214,7 @@ export function gatewayEnglishDocs(stats: GatewayDocStats): GatewayDocBundle {
                 ["403", "project_forbidden / model_not_allowed", "Check project membership and whether the model is open to the project."],
                 ["404/503", "provider_unavailable", "Enable a route for the model or check upstream provider health."],
                 ["429", "quota_exceeded", "Check project quota, concurrency limits, and provider resource limits."],
-                ["500", "upstream_error", `Inspect request_id in Request Logs; current log sample is ${formatNumber(stats.requestLogCount)} records.`],
+                ["500", "upstream_error", `Inspect request_id in Request Logs; visible billable request total is ${formatNumber(stats.requestLogCount)}.`],
               ],
             },
           },

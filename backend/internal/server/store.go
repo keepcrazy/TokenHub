@@ -198,6 +198,7 @@ type Store interface {
 	UsageTimeseries(days int) []map[string]any
 	GenerateBillingPeriod(period string) (map[string]any, error)
 	ListRequestLogs() []RequestLog
+	QueryRequestLogs(query RequestLogQuery) (RequestLogQueryResult, error)
 	ListProviderObservations(since time.Time) []ProviderObservation
 	RecordProviderObservation(observation ProviderObservation)
 	GetProviderResourceObservation(resourceID string) (ProviderResourceObservation, bool)
@@ -3560,6 +3561,104 @@ func (s *GormStore) ListRequestLogs() []RequestLog {
 	var items []RequestLog
 	_ = s.db.Order("created_at desc").Find(&items).Error
 	return items
+}
+
+func (s *GormStore) QueryRequestLogs(query RequestLogQuery) (RequestLogQueryResult, error) {
+	result := RequestLogQueryResult{Data: []RequestLog{}}
+	filtered := s.requestLogFilters(s.requestLogScope(query), query)
+	if err := filtered.Count(&result.Total).Error; err != nil {
+		return RequestLogQueryResult{}, err
+	}
+	if err := filtered.Order("request_logs.created_at DESC").Order("request_logs.id DESC").Limit(query.PageSize).Offset((query.Page - 1) * query.PageSize).Find(&result.Data).Error; err != nil {
+		return RequestLogQueryResult{}, err
+	}
+	var summary struct {
+		All              int64   `gorm:"column:all_count"`
+		OK               int64   `gorm:"column:ok_count"`
+		Error            int64   `gorm:"column:error_count"`
+		AverageLatencyMS float64 `gorm:"column:average_latency_ms"`
+	}
+	if err := s.requestLogScope(query).Select(`
+		COUNT(*) AS all_count,
+		COALESCE(SUM(CASE WHEN request_logs.status_code < 400 THEN 1 ELSE 0 END), 0) AS ok_count,
+		COALESCE(SUM(CASE WHEN request_logs.status_code >= 400 THEN 1 ELSE 0 END), 0) AS error_count,
+		COALESCE(AVG(request_logs.latency_ms), 0) AS average_latency_ms
+	`).Scan(&summary).Error; err != nil {
+		return RequestLogQueryResult{}, err
+	}
+	result.Summary = RequestLogSummary(summary)
+	return result, nil
+}
+
+func (s *GormStore) requestLogScope(query RequestLogQuery) *gorm.DB {
+	scope := s.db.Model(&RequestLog{})
+	if query.AllowGlobal {
+		return scope
+	}
+	if query.TeamLeader {
+		conditions := make([]string, 0, 2)
+		args := make([]any, 0, 2)
+		if len(query.VisibleProjectIDs) > 0 {
+			conditions = append(conditions, "request_logs.project_id IN ?")
+			args = append(args, query.VisibleProjectIDs)
+		}
+		if len(query.VisibleAPIKeyIDs) > 0 {
+			conditions = append(conditions, "request_logs.api_key_id IN ?")
+			args = append(args, query.VisibleAPIKeyIDs)
+		}
+		if len(conditions) == 0 {
+			return scope.Where("1 = 0")
+		}
+		return scope.Where("("+strings.Join(conditions, " OR ")+")", args...)
+	}
+	if len(query.VisibleAPIKeyIDs) == 0 {
+		return scope.Where("1 = 0")
+	}
+	return scope.Where("request_logs.api_key_id IN ?", query.VisibleAPIKeyIDs)
+}
+
+func (s *GormStore) requestLogFilters(scope *gorm.DB, query RequestLogQuery) *gorm.DB {
+	if query.Status == "ok" {
+		scope = scope.Where("request_logs.status_code < ?", 400)
+	} else if query.Status == "error" {
+		scope = scope.Where("request_logs.status_code >= ?", 400)
+	}
+	if query.Query == "" {
+		return scope
+	}
+	like := "%" + escapeRequestLogLike(strings.ToLower(query.Query)) + "%"
+	conditions := make([]string, 0, 12)
+	args := make([]any, 0, 14)
+	addLike := func(condition string) {
+		conditions = append(conditions, condition)
+		args = append(args, like)
+	}
+	addLike(`LOWER(request_logs.request_id) LIKE ? ESCAPE '\'`)
+	addLike(`LOWER(request_logs.project_id) LIKE ? ESCAPE '\'`)
+	addLike(`LOWER(request_logs.api_key_id) LIKE ? ESCAPE '\'`)
+	addLike(`LOWER(request_logs.model_name) LIKE ? ESCAPE '\'`)
+	addLike(`LOWER(request_logs.provider_id) LIKE ? ESCAPE '\'`)
+	addLike(`LOWER(request_logs.provider_resource_id) LIKE ? ESCAPE '\'`)
+	addLike(`LOWER(request_logs.provider_model) LIKE ? ESCAPE '\'`)
+	addLike(`LOWER(request_logs.error_code) LIKE ? ESCAPE '\'`)
+	addLike(`LOWER(CAST(request_logs.status_code AS TEXT)) LIKE ? ESCAPE '\'`)
+	if query.AllowGlobal {
+		addLike(`EXISTS (SELECT 1 FROM projects project_search WHERE project_search.id = request_logs.project_id AND LOWER(project_search.name) LIKE ? ESCAPE '\')`)
+		addLike(`EXISTS (SELECT 1 FROM providers provider_search WHERE provider_search.id = request_logs.provider_id AND LOWER(provider_search.name) LIKE ? ESCAPE '\')`)
+		conditions = append(conditions, `EXISTS (SELECT 1 FROM provider_resources resource_search WHERE resource_search.id = request_logs.provider_resource_id AND (
+			LOWER(resource_search.provider_id) LIKE ? ESCAPE '\' OR
+			EXISTS (SELECT 1 FROM providers fallback_provider_search WHERE fallback_provider_search.id = resource_search.provider_id AND LOWER(fallback_provider_search.name) LIKE ? ESCAPE '\')
+		))`)
+		args = append(args, like, like)
+	} else if len(query.VisibleProjectIDs) > 0 {
+		conditions = append(conditions, `EXISTS (SELECT 1 FROM projects project_search WHERE project_search.id = request_logs.project_id AND project_search.id IN ? AND LOWER(project_search.name) LIKE ? ESCAPE '\')`)
+		args = append(args, query.VisibleProjectIDs, like)
+	}
+	return scope.Where("("+strings.Join(conditions, " OR ")+")", args...)
+}
+
+func escapeRequestLogLike(value string) string {
+	return strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(value)
 }
 
 func (s *GormStore) ListProviderObservations(since time.Time) []ProviderObservation {

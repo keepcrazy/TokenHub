@@ -335,7 +335,7 @@ export function gatewayJapaneseLLMUsageDocs(stats: GatewayDocStats, role: AppRol
                 ["403", "Project、Key、モデル権限がリクエストを許可していません。", teamLeader ? "Project メンバー、Key のモデル範囲、チーム Project 所有を確認します。" : "チームリーダーに Project メンバーとモデル権限の確認を依頼します。"],
                 ["404/503", "モデルを処理できる健全なルートがありません。", "管理者にルート有効化または Provider ヘルス確認を依頼します。"],
                 ["429", "Project クォータ、同時実行、Provider リソース制限に達しました。", teamLeader ? "Project クォータと同時実行制限を確認します。" : "クォータ回復を待つか、増枠を依頼します。"],
-                ["500", "上流 Provider またはルーティングエラー。", `Request Logs で request_id を検索します。現在見えるログサンプル: ${formatNumber(stats.requestLogCount)} 件。`],
+                ["500", "上流 Provider またはルーティングエラー。", `Request Logs で request_id を検索します。表示可能な課金対象リクエスト総数: ${formatNumber(stats.requestLogCount)} 件。`],
               ],
             },
           },

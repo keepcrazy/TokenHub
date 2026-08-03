@@ -306,8 +306,8 @@ export function pageHeaderChips(view: ViewKey, data: AppData, user: AdminUser) {
       ];
     case "audit":
       return [
-        { label: "请求日志", value: formatNumber(data.logs.length) },
-        { label: "错误请求", value: formatNumber(data.summary.errors) },
+        { label: "计费请求", value: formatNumber(data.summary.request_count) },
+        { label: "计费错误", value: formatNumber(data.summary.errors) },
       ];
     default:
       return [{ label: "记录", value: formatNumber(pageRecordCount(view, data)) }];

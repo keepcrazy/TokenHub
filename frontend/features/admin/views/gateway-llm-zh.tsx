@@ -335,7 +335,7 @@ export function gatewayChineseLLMUsageDocs(stats: GatewayDocStats, role: AppRole
                 ["403", "项目、Key 或模型权限不允许当前请求。", teamLeader ? "检查项目成员、Key 模型范围和团队项目归属。" : "联系团队负责人检查项目成员和模型权限。"],
                 ["404/503", "该模型没有可用健康路由。", "请管理员启用路由或检查 Provider 健康状态。"],
                 ["429", "项目额度、并发或 Provider 资源限制触发。", teamLeader ? "查看项目额度和并发限制。" : "等待额度恢复或申请提升额度。"],
-                ["500", "上游 Provider 或路由错误。", `在请求日志中搜索 request_id。当前可见日志样本：${formatNumber(stats.requestLogCount)} 条。`],
+                ["500", "上游 Provider 或路由错误。", `在请求日志中搜索 request_id。可见计费请求总数：${formatNumber(stats.requestLogCount)} 条。`],
               ],
             },
           },

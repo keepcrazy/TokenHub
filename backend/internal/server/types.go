@@ -412,8 +412,8 @@ type UsageRecord struct {
 type RequestLog struct {
 	ID                 string    `json:"id" gorm:"primaryKey"`
 	RequestID          string    `json:"request_id" gorm:"index"`
-	ProjectID          string    `json:"project_id" gorm:"index"`
-	APIKeyID           string    `json:"api_key_id" gorm:"index"`
+	ProjectID          string    `json:"project_id" gorm:"index;index:idx_request_logs_project_created,priority:1"`
+	APIKeyID           string    `json:"api_key_id" gorm:"index;index:idx_request_logs_api_key_created,priority:1"`
 	ModelName          string    `json:"model" gorm:"index"`
 	ProviderID         string    `json:"provider_id,omitempty" gorm:"index"`
 	ProviderResourceID string    `json:"provider_resource_id,omitempty" gorm:"index"`
@@ -427,7 +427,31 @@ type RequestLog struct {
 	LatencyMS          int64     `json:"latency_ms"`
 	ClientIP           string    `json:"client_ip,omitempty"`
 	UserAgent          string    `json:"user_agent,omitempty"`
-	CreatedAt          time.Time `json:"created_at"`
+	CreatedAt          time.Time `json:"created_at" gorm:"index;index:idx_request_logs_project_created,priority:2;index:idx_request_logs_api_key_created,priority:2"`
+}
+
+type RequestLogQuery struct {
+	Page              int
+	PageSize          int
+	Status            string
+	Query             string
+	AllowGlobal       bool
+	TeamLeader        bool
+	VisibleProjectIDs []string
+	VisibleAPIKeyIDs  []string
+}
+
+type RequestLogSummary struct {
+	All              int64   `json:"all"`
+	OK               int64   `json:"ok"`
+	Error            int64   `json:"error"`
+	AverageLatencyMS float64 `json:"average_latency_ms"`
+}
+
+type RequestLogQueryResult struct {
+	Data    []RequestLog
+	Total   int64
+	Summary RequestLogSummary
 }
 
 type RequestPayloadLog struct {
