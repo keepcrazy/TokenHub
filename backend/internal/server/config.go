@@ -42,13 +42,22 @@ type Config struct {
 	MetricsToken string
 	// MetricsProjectLabel adds project_id to every gateway metric. Off by default
 	// because it multiplies the series count of every metric by the project count.
-	MetricsProjectLabel      bool
-	InFlightLeaseTTLSeconds  int
-	ClusterLockTTLSeconds    int
-	GracefulShutdownSeconds  int
-	DBMaxOpenConns           int
-	DBMaxIdleConns           int
-	DBConnMaxLifetimeMinutes int
+	MetricsProjectLabel bool
+	// UpstreamNonStreamTimeoutSeconds bounds one non-streaming upstream exchange
+	// end to end. Streaming calls deliberately have no such bound: it would cover
+	// reading the response body and so truncate a stream that is still producing.
+	UpstreamNonStreamTimeoutSeconds int
+	// UpstreamStreamIdleTimeoutSeconds is how long a streaming upstream call may
+	// wait for response headers, and how long its body may then stay silent. The
+	// budget restarts on every delivered byte, so a stream lives as long as the
+	// upstream keeps producing.
+	UpstreamStreamIdleTimeoutSeconds int
+	InFlightLeaseTTLSeconds          int
+	ClusterLockTTLSeconds            int
+	GracefulShutdownSeconds          int
+	DBMaxOpenConns                   int
+	DBMaxIdleConns                   int
+	DBConnMaxLifetimeMinutes         int
 	// CacheAffinityEnabled turns on stateless cache locality routing. Off by
 	// default because it changes routing behaviour; roll back by turning it off
 	// rather than by rolling back the binary.
@@ -69,7 +78,7 @@ type Config struct {
 }
 
 func ConfigFromEnv() Config {
-	return Config{
+	config := Config{
 		Environment:                getenv("TOKENHUB_ENV", "dev"),
 		AppVersion:                 DefaultAppVersion,
 		BuildType:                  defaultBuildType,
@@ -110,6 +119,9 @@ func ConfigFromEnv() Config {
 		ImageJobTimeoutSeconds:      getenvInt("TOKENHUB_IMAGE_JOB_TIMEOUT_SECONDS", 300),
 		ImageCapabilityRetrySecs:    getenvInt("TOKENHUB_IMAGE_CAPABILITY_RETRY_SECONDS", 86400),
 	}
+	config.UpstreamNonStreamTimeoutSeconds = getenvInt("TOKENHUB_UPSTREAM_NON_STREAM_TIMEOUT_SECONDS", defaultUpstreamNonStreamTimeoutSeconds)
+	config.UpstreamStreamIdleTimeoutSeconds = getenvInt("TOKENHUB_UPSTREAM_STREAM_IDLE_TIMEOUT_SECONDS", defaultUpstreamStreamIdleTimeoutSeconds)
+	return config
 }
 
 func (c Config) ValidateForStartup() error {
