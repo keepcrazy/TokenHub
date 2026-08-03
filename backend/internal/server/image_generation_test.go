@@ -466,6 +466,130 @@ func (s imageStartRejectStore) StartCall(context.Context, Project, APIKey, strin
 	return CallContext{}, ErrModelNotAllowed
 }
 
+func TestNativeCodexJSONImageEditUsesSubscriptionRoute(t *testing.T) {
+	imageBytes := realPNGFixture(t)
+	imageURL := "data:image/png;base64," + encodeBase64(imageBytes)
+	store := NewMemoryStore()
+	project := store.CreateProject(Project{Name: "Native Codex Image Edit Project"})
+	_, secret, err := store.CreateAPIKey(project.ID, APIKey{
+		Name: "native-codex-image-edit", Allowed: []string{codexImageModelName}, Status: StatusActive,
+	}, "thk_native_codex_image_edit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := store.AddProvider(Provider{
+		ID: "prv_native_codex_image_edit", Name: "Native Codex Image Edit",
+		Type: ProviderOpenAICodex, Status: StatusActive, Healthy: true,
+	})
+	if _, err := store.AddProviderResource(ProviderResource{
+		ID: "rsrc_native_codex_image_edit", ProviderID: provider.ID, Name: "Native Codex Image Account",
+		ResourceType: ProviderResourceOpenAISubscription, Status: StatusActive, Healthy: true,
+		Options: map[string]string{codexImageCapabilityOption: codexImageCapabilitySupported},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	store.AddModel(Model{Name: codexImageModelName, Modality: "image", Status: StatusActive})
+	server := NewWithConfig(store, Config{
+		AdminToken: "test-admin-token", SecretKey: "native-codex-image-edit-secret", ImageStorageDir: t.TempDir(),
+	})
+	t.Cleanup(func() { _ = server.Shutdown(context.Background()) })
+	var routedModel string
+	var routedAction string
+	var routedInputCount int
+	server.imageRunner = func(_ context.Context, route RouteSelection, job ImageJob) ([]byte, string, Usage, error) {
+		routedModel = route.Route.ModelName
+		routedAction = job.Action
+		for _, asset := range store.ListImageAssets(job.ID) {
+			if asset.Role == "input" {
+				routedInputCount++
+			}
+		}
+		return imageBytes, "", Usage{PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2}, nil
+	}
+
+	images := make([]map[string]any, 16)
+	for index := range images {
+		images[index] = map[string]any{"image_url": imageURL}
+	}
+	response := doImageJSON(t, server.Handler(), http.MethodPost, "/v1/images/edits", map[string]any{
+		"model": openAIImageModelName, "prompt": "Combine all reference images.",
+		"images": images, "quality": "low", "size": "1024x1024", "response_format": "url",
+	}, secret, map[string]string{"x-codex-image-turn-id": "turn_native_edit"})
+	if response.Code != http.StatusOK {
+		t.Fatalf("native Codex JSON edit: status=%d body=%s", response.Code, response.Body)
+	}
+	if routedModel != codexImageModelName || routedAction != "edit" || routedInputCount != 16 {
+		t.Fatalf("unexpected native Codex edit route: model=%q action=%q inputs=%d", routedModel, routedAction, routedInputCount)
+	}
+	var success map[string]any
+	if err := json.Unmarshal([]byte(response.Body), &success); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := success["data"].([]any)
+	if len(data) != 1 {
+		t.Fatalf("native Codex edit must return one image: %+v", success)
+	}
+	first, _ := data[0].(map[string]any)
+	if first["b64_json"] == "" || first["url"] != nil {
+		t.Fatalf("native Codex edit must return b64_json: %+v", success)
+	}
+
+	tooMany := append(images, map[string]any{"image_url": imageURL})
+	tests := []struct {
+		name      string
+		payload   map[string]any
+		headers   map[string]string
+		status    int
+		errorCode string
+	}{
+		{
+			name:    "more than sixteen images",
+			payload: map[string]any{"model": openAIImageModelName, "prompt": "too many", "images": tooMany},
+			headers: map[string]string{"x-codex-image-turn-id": "turn_too_many"},
+			status:  http.StatusBadRequest, errorCode: "too_many_images",
+		},
+		{
+			name:    "missing images",
+			payload: map[string]any{"model": openAIImageModelName, "prompt": "missing"},
+			headers: map[string]string{"x-codex-image-turn-id": "turn_missing"},
+			status:  http.StatusBadRequest, errorCode: "missing_image",
+		},
+		{
+			name: "invalid base64 image",
+			payload: map[string]any{
+				"model": openAIImageModelName, "prompt": "invalid",
+				"images": []map[string]any{{"image_url": "data:image/png;base64,not-base64"}},
+			},
+			headers: map[string]string{"Originator": "codex_cli_rs"},
+			status:  http.StatusBadRequest, errorCode: "invalid_input_image",
+		},
+		{
+			name: "ordinary JSON client",
+			payload: map[string]any{
+				"model": openAIImageModelName, "prompt": "not Codex",
+				"images": []map[string]any{{"image_url": imageURL}},
+			},
+			status: http.StatusUnsupportedMediaType, errorCode: "invalid_content_type",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			response := doImageJSON(t, server.Handler(), http.MethodPost, "/v1/images/edits", test.payload, secret, test.headers)
+			if response.Code != test.status {
+				t.Fatalf("status=%d body=%s, want %d", response.Code, response.Body, test.status)
+			}
+			var payload map[string]any
+			if err := json.Unmarshal([]byte(response.Body), &payload); err != nil {
+				t.Fatal(err)
+			}
+			errorPayload, _ := payload["error"].(map[string]any)
+			if errorPayload["code"] != test.errorCode {
+				t.Fatalf("error code=%v body=%s, want %q", errorPayload["code"], response.Body, test.errorCode)
+			}
+		})
+	}
+}
+
 func TestImageAuthorizationHappensBeforeJobOrAssetPersistence(t *testing.T) {
 	store := NewMemoryStore()
 	project := store.CreateProject(Project{Name: "Rejected Image Project"})
