@@ -114,7 +114,7 @@ func ConfigFromEnv() Config {
 		CacheAffinityModels:         getenvList("TOKENHUB_CACHE_AFFINITY_MODELS"),
 		CacheAffinityAllowUserScope: getenvBool("TOKENHUB_CACHE_AFFINITY_ALLOW_USER_SCOPE", false),
 		ImageStorageDir:             getenv("TOKENHUB_IMAGE_STORAGE_DIR", defaultImageStorageDir()),
-		ImageWorkerConcurrency:      getenvInt("TOKENHUB_IMAGE_WORKER_CONCURRENCY", 2),
+		ImageWorkerConcurrency:      getenvInt("TOKENHUB_IMAGE_WORKER_CONCURRENCY", 6),
 		ImageQueueCapacity:          getenvInt("TOKENHUB_IMAGE_QUEUE_CAPACITY", 64),
 		ImageJobTimeoutSeconds:      getenvInt("TOKENHUB_IMAGE_JOB_TIMEOUT_SECONDS", 300),
 		ImageCapabilityRetrySecs:    getenvInt("TOKENHUB_IMAGE_CAPABILITY_RETRY_SECONDS", 86400),

@@ -172,7 +172,7 @@ export function providerResourceDraftDefaults(provider: { provider_id?: string; 
     weight: "100",
     rate_limit_rpm: "",
     token_limit_tpm: "",
-    max_concurrency: "3",
+    max_concurrency: "10",
     token_type: "",
     expires_at: "",
     scopes: "",

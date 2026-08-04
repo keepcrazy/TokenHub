@@ -356,10 +356,22 @@ func TestCodexImageConcurrencyIsIsolatedPerAccount(t *testing.T) {
 	}
 	defer releaseFirst()
 
+	releaseSecond, err := server.acquireImageAccount(context.Background(), "account-a")
+	if err != nil {
+		t.Fatalf("a second request on the same account must be admitted: %v", err)
+	}
+	defer releaseSecond()
+
+	releaseThird, err := server.acquireImageAccount(context.Background(), "account-a")
+	if err != nil {
+		t.Fatalf("a third request on the same account must be admitted: %v", err)
+	}
+	defer releaseThird()
+
 	blockedContext, cancelBlocked := context.WithTimeout(context.Background(), 30*time.Millisecond)
 	defer cancelBlocked()
 	if _, err := server.acquireImageAccount(blockedContext, "account-a"); err == nil {
-		t.Fatal("a second request on the same account must wait for the first request")
+		t.Fatal("a fourth request on the same account must wait for an available slot")
 	}
 
 	otherContext, cancelOther := context.WithTimeout(context.Background(), time.Second)

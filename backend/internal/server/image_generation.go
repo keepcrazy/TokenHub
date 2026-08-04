@@ -19,18 +19,19 @@ import (
 )
 
 const (
-	imageJobStatusQueued     = "queued"
-	imageJobStatusRunning    = "running"
-	imageJobStatusCompleted  = "completed"
-	imageJobStatusFailed     = "failed"
-	imageDownloadTTL         = 24 * time.Hour
-	maxGeneratedImageBytes   = 64 << 20
-	maxImageEditRequestBytes = 128 << 20
-	maxInputImageBytes       = 50 << 20
-	maxImageEditInputCount   = 16
-	maxImageTextFieldBytes   = 1 << 20
-	codexImageModelName      = "codex-gpt-image-2"
-	openAIImageModelName     = "gpt-image-2"
+	imageJobStatusQueued         = "queued"
+	imageJobStatusRunning        = "running"
+	imageJobStatusCompleted      = "completed"
+	imageJobStatusFailed         = "failed"
+	imageDownloadTTL             = 24 * time.Hour
+	maxGeneratedImageBytes       = 64 << 20
+	maxImageEditRequestBytes     = 128 << 20
+	maxInputImageBytes           = 50 << 20
+	maxImageEditInputCount       = 16
+	maxImageTextFieldBytes       = 1 << 20
+	codexImageModelName          = "codex-gpt-image-2"
+	openAIImageModelName         = "gpt-image-2"
+	codexImageAccountConcurrency = 3
 )
 
 type imageGenerationRequest struct {
@@ -664,7 +665,7 @@ func (s *Server) acquireImageAccount(ctx context.Context, resourceID string) (fu
 	s.imageAccountMu.Lock()
 	slot := s.imageAccountSlots[resourceID]
 	if slot == nil {
-		slot = make(chan struct{}, 1)
+		slot = make(chan struct{}, codexImageAccountConcurrency)
 		s.imageAccountSlots[resourceID] = slot
 	}
 	s.imageAccountMu.Unlock()

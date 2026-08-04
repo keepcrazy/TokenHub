@@ -61,7 +61,7 @@ func NewWithConfig(store Store, config Config) *Server {
 		config.ImageStorageDir = defaultImageStorageDir()
 	}
 	if config.ImageWorkerConcurrency <= 0 {
-		config.ImageWorkerConcurrency = 2
+		config.ImageWorkerConcurrency = 6
 	}
 	if config.ImageQueueCapacity <= 0 {
 		config.ImageQueueCapacity = 64
