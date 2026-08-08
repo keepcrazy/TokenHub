@@ -96,7 +96,6 @@ func (s *Server) handleImageGenerations(w http.ResponseWriter, r *http.Request) 
 	originator := strings.ToLower(strings.TrimSpace(r.Header.Get("originator")))
 	if strings.TrimSpace(request.Model) == openAIImageModelName &&
 		(strings.TrimSpace(r.Header.Get("x-codex-image-turn-id")) != "" || strings.HasPrefix(originator, "codex")) {
-		request.Model = codexImageModelName
 		request.ResponseFormat = "b64_json"
 	}
 	if err := normalizeImageGenerationRequest(&request); err != nil {
@@ -386,9 +385,6 @@ func decodeNativeCodexImageEdit(r *http.Request) (imageGenerationRequest, []uplo
 	request := imageGenerationRequest{
 		Model: payload.Model, Prompt: payload.Prompt, N: payload.N, Quality: payload.Quality,
 		Size: payload.Size, ResponseFormat: payload.ResponseFormat,
-	}
-	if strings.TrimSpace(request.Model) == openAIImageModelName {
-		request.Model = codexImageModelName
 	}
 	request.ResponseFormat = "b64_json"
 	return request, inputs, nil

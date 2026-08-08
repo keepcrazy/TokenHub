@@ -466,38 +466,91 @@ func (s imageStartRejectStore) StartCall(context.Context, Project, APIKey, strin
 	return CallContext{}, ErrModelNotAllowed
 }
 
-func TestNativeCodexJSONImageEditUsesSubscriptionRoute(t *testing.T) {
+func TestNativeCodexImageGenerationUsesAPIRoute(t *testing.T) {
+	imageBytes := realPNGFixture(t)
+	store := NewMemoryStore()
+	project := store.CreateProject(Project{Name: "Native Codex Image Generation Project"})
+	_, secret, err := store.CreateAPIKey(project.ID, APIKey{
+		Name: "native-codex-image-generation", Allowed: []string{openAIImageModelName}, Status: StatusActive,
+	}, "thk_native_codex_image_generation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := store.AddProvider(Provider{
+		ID: "prv_native_codex_image_generation", Name: "Native Codex Image API",
+		Type: ProviderOpenAI, Status: StatusActive, Healthy: true,
+	})
+	store.AddModel(Model{Name: openAIImageModelName, Modality: "image", Status: StatusActive})
+	store.AddRoute(ModelRoute{
+		ModelName: openAIImageModelName, ProviderID: provider.ID, ProviderModel: openAIImageModelName,
+		Priority: 1, Weight: 100, Status: StatusActive,
+	})
+	server := NewWithConfig(store, Config{
+		AdminToken: "test-admin-token", SecretKey: "native-codex-image-generation-secret", ImageStorageDir: t.TempDir(),
+	})
+	t.Cleanup(func() { _ = server.Shutdown(context.Background()) })
+	var routedModel string
+	var routedProvider string
+	server.imageRunner = func(_ context.Context, route RouteSelection, _ ImageJob) ([]byte, string, Usage, error) {
+		routedModel = route.Route.ModelName
+		routedProvider = route.Provider.ID
+		return imageBytes, "", Usage{PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2}, nil
+	}
+
+	response := doImageJSON(t, server.Handler(), http.MethodPost, "/v1/images/generations", map[string]any{
+		"model": openAIImageModelName, "prompt": "Draw one blue circle.", "response_format": "url",
+	}, secret, map[string]string{"x-codex-image-turn-id": "turn_native_generation"})
+	if response.Code != http.StatusOK {
+		t.Fatalf("native Codex generation: status=%d body=%s", response.Code, response.Body)
+	}
+	if routedModel != openAIImageModelName || routedProvider != provider.ID {
+		t.Fatalf("native Codex generation must use API route: model=%q provider=%q", routedModel, routedProvider)
+	}
+	var success map[string]any
+	if err := json.Unmarshal([]byte(response.Body), &success); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := success["data"].([]any)
+	if len(data) != 1 {
+		t.Fatalf("native Codex generation must return one image: %+v", success)
+	}
+	first, _ := data[0].(map[string]any)
+	if first["b64_json"] == "" || first["url"] != nil {
+		t.Fatalf("native Codex generation must return b64_json: %+v", success)
+	}
+}
+
+func TestNativeCodexJSONImageEditUsesAPIRoute(t *testing.T) {
 	imageBytes := realPNGFixture(t)
 	imageURL := "data:image/png;base64," + encodeBase64(imageBytes)
 	store := NewMemoryStore()
 	project := store.CreateProject(Project{Name: "Native Codex Image Edit Project"})
 	_, secret, err := store.CreateAPIKey(project.ID, APIKey{
-		Name: "native-codex-image-edit", Allowed: []string{codexImageModelName}, Status: StatusActive,
+		Name: "native-codex-image-edit", Allowed: []string{openAIImageModelName}, Status: StatusActive,
 	}, "thk_native_codex_image_edit")
 	if err != nil {
 		t.Fatal(err)
 	}
 	provider := store.AddProvider(Provider{
-		ID: "prv_native_codex_image_edit", Name: "Native Codex Image Edit",
-		Type: ProviderOpenAICodex, Status: StatusActive, Healthy: true,
+		ID: "prv_native_codex_image_edit", Name: "Native Codex Image API",
+		Type: ProviderOpenAI, Status: StatusActive, Healthy: true,
 	})
-	if _, err := store.AddProviderResource(ProviderResource{
-		ID: "rsrc_native_codex_image_edit", ProviderID: provider.ID, Name: "Native Codex Image Account",
-		ResourceType: ProviderResourceOpenAISubscription, Status: StatusActive, Healthy: true,
-		Options: map[string]string{codexImageCapabilityOption: codexImageCapabilitySupported},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	store.AddModel(Model{Name: codexImageModelName, Modality: "image", Status: StatusActive})
+	store.AddModel(Model{Name: openAIImageModelName, Modality: "image", Status: StatusActive})
+	store.AddRoute(ModelRoute{
+		ModelName: openAIImageModelName, ProviderID: provider.ID, ProviderModel: openAIImageModelName,
+		Priority: 1, Weight: 100, Status: StatusActive,
+	})
 	server := NewWithConfig(store, Config{
 		AdminToken: "test-admin-token", SecretKey: "native-codex-image-edit-secret", ImageStorageDir: t.TempDir(),
 	})
 	t.Cleanup(func() { _ = server.Shutdown(context.Background()) })
 	var routedModel string
+	var routedProvider string
 	var routedAction string
 	var routedInputCount int
 	server.imageRunner = func(_ context.Context, route RouteSelection, job ImageJob) ([]byte, string, Usage, error) {
 		routedModel = route.Route.ModelName
+		routedProvider = route.Provider.ID
 		routedAction = job.Action
 		for _, asset := range store.ListImageAssets(job.ID) {
 			if asset.Role == "input" {
@@ -518,8 +571,8 @@ func TestNativeCodexJSONImageEditUsesSubscriptionRoute(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("native Codex JSON edit: status=%d body=%s", response.Code, response.Body)
 	}
-	if routedModel != codexImageModelName || routedAction != "edit" || routedInputCount != 16 {
-		t.Fatalf("unexpected native Codex edit route: model=%q action=%q inputs=%d", routedModel, routedAction, routedInputCount)
+	if routedModel != openAIImageModelName || routedProvider != provider.ID || routedAction != "edit" || routedInputCount != 16 {
+		t.Fatalf("unexpected native Codex edit route: model=%q provider=%q action=%q inputs=%d", routedModel, routedProvider, routedAction, routedInputCount)
 	}
 	var success map[string]any
 	if err := json.Unmarshal([]byte(response.Body), &success); err != nil {
