@@ -21,6 +21,7 @@ type Server struct {
 	providerCatalog   *providerCatalogService
 	billing           *BillingService
 	reconciliation    *ReconciliationService
+	payloadCleanup    *requestPayloadCleanupService
 	mux               *http.ServeMux
 	config            Config
 	metrics           *GatewayMetrics
@@ -101,6 +102,7 @@ func NewWithConfig(store Store, config Config) *Server {
 		providerCatalog:   newProviderCatalogService(store, config.ProviderCatalogFile),
 		billing:           newBillingService(store),
 		reconciliation:    newReconciliationService(store),
+		payloadCleanup:    newRequestPayloadCleanupService(store, config.RequestPayloadRetentionDays),
 		mux:               http.NewServeMux(),
 		config:            config,
 		imageStorageDir:   config.ImageStorageDir,
