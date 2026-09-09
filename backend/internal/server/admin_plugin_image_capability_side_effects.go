@@ -44,6 +44,7 @@ type providerImageCapabilityRouteProfile struct {
 	RequestAliasHeader          string
 	RequestAliasOriginator      string
 	RequestAliasResponseFormat  string
+	RequestAliasPreserveModel   bool
 	RequestDefaultModel         bool
 	RequestSupportsMask         bool
 	RequestSupportsMaskSet      bool
@@ -229,6 +230,9 @@ func providerImageCapabilityProfileFromAction(descriptor pluginmeta.ActionDescri
 			descriptor.Metadata["request_alias.response_format"],
 			descriptor.Metadata["image_request_alias_response_format"],
 		))),
+		RequestAliasPreserveModel: truthyString(
+			descriptor.Metadata["request_alias.preserve_model"],
+		),
 		RequestDefaultModel: truthyString(firstNonEmpty(
 			descriptor.Metadata["request.default_model"],
 			descriptor.Metadata["image_request_default_model"],
@@ -542,6 +546,7 @@ func (p providerImageCapabilityRouteProfile) key() string {
 		p.RequestAliasHeader,
 		p.RequestAliasOriginator,
 		p.RequestAliasResponseFormat,
+		boolString(p.RequestAliasPreserveModel),
 		boolString(p.RequestDefaultModel),
 		boolString(p.RequestSupportsMask),
 		p.RequestSizePolicy,

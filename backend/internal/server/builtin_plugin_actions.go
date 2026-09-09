@@ -577,6 +577,7 @@ func openAICodexImageCapabilityActionDescriptor() pluginmeta.ActionDescriptor {
 			"request_alias.model":                                            openAIImageModelName,
 			"request_alias.header":                                           "x-codex-image-turn-id",
 			"request_alias.originator_prefix":                                "codex",
+			"request_alias.preserve_model":                                   "true",
 			"request_alias.response_format":                                  "b64_json",
 			"request.default_model":                                          "true",
 			"request.supports_mask":                                          "false",

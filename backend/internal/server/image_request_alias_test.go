@@ -57,6 +57,41 @@ func TestImageGenerationRequestAliasUsesPluginMetadata(t *testing.T) {
 	}
 }
 
+func TestImageGenerationRequestAliasCanPreserveModel(t *testing.T) {
+	server := New(NewMemoryStore())
+	if err := server.Shutdown(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := server.pluginActions.Register(pluginmeta.ActionDescriptor{
+		PluginID:   "tokenhub.provider.api-image-alias",
+		ActionID:   "api-image.image_capability.configure",
+		Kind:       pluginmeta.ActionKindMutate,
+		Capability: "image.capability.configure",
+		Subject:    "api_image",
+		Metadata: map[string]string{
+			"public_model":                  "subscription-image",
+			"upstream_model":                "upstream-image",
+			"request_alias.model":           openAIImageModelName,
+			"request_alias.header":          "x-api-image-turn-id",
+			"request_alias.response_format": "b64_json",
+			"request_alias.preserve_model":  "true",
+		},
+	}, pluginmeta.ActionHandlerFunc(func(context.Context, pluginmeta.ActionInvocation) (pluginmeta.ActionResult, error) {
+		return pluginmeta.ActionResult{}, nil
+	})); err != nil {
+		t.Fatal(err)
+	}
+
+	request := imageGenerationRequest{Model: openAIImageModelName, ResponseFormat: "url"}
+	httpRequest := httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	httpRequest.Header.Set("x-api-image-turn-id", "turn_123")
+	server.applyImageGenerationRequestAliases(httpRequest, &request)
+
+	if request.Model != openAIImageModelName || request.ResponseFormat != "b64_json" {
+		t.Fatalf("preserved alias = %+v, want model %q and b64_json", request, openAIImageModelName)
+	}
+}
+
 func TestImageGenerationDefaultModelUsesPluginMetadata(t *testing.T) {
 	server := &Server{pluginActions: pluginmeta.NewActionBroker()}
 	if err := server.pluginActions.Register(pluginmeta.ActionDescriptor{

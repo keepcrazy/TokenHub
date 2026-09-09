@@ -1033,34 +1033,26 @@ func TestImageQueueHonorsWorkerAndCapacityLimits(t *testing.T) {
 	}
 }
 
-func TestCodexImageRequestUsesSubscriptionCompatibleResponse(t *testing.T) {
+func TestCodexImageRequestUsesOpenAIAPIRoute(t *testing.T) {
 	imageBytes := realPNGFixture(t)
 	store := NewMemoryStore()
 	project := store.CreateProject(Project{Name: "Codex App Image Project"})
 	_, secret, err := store.CreateAPIKey(project.ID, APIKey{
 		Name:    "codex-app-image-key",
-		Allowed: []string{codexImageModelName},
+		Allowed: []string{openAIImageModelName},
 		Status:  StatusActive,
 	}, "thk_codex_app_image")
 	if err != nil {
 		t.Fatal(err)
 	}
 	provider := store.AddProvider(Provider{
-		ID: "prv_codex_app_image", Name: "Codex App Image", Type: ProviderOpenAICodex, Status: StatusActive, Healthy: true,
+		ID: "prv_codex_app_image", Name: "Codex App Image", Type: ProviderOpenAI, Status: StatusActive, Healthy: true,
 	})
-	resource, err := store.AddProviderResource(ProviderResource{
-		ID: "rsrc_codex_app_image", ProviderID: provider.ID, Name: "Codex App Image Account",
-		ResourceType: ProviderResourceOpenAISubscription, Status: StatusActive, Healthy: true,
-		Options: map[string]string{codexImageCapabilityOption: codexImageCapabilitySupported},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	store.AddRoute(ModelRoute{
-		ModelName: codexImageModelName, ProviderID: provider.ID, ProviderModel: codexImageUpstreamModel,
+		ModelName: openAIImageModelName, ProviderID: provider.ID, ProviderModel: openAIImageModelName,
 		Priority: 1, Weight: 100, Status: StatusActive,
 	})
-	store.AddModel(Model{Name: codexImageModelName, Modality: "image", Status: StatusActive})
+	store.AddModel(Model{Name: openAIImageModelName, Modality: "image", Status: StatusActive})
 
 	server := NewWithConfig(store, Config{
 		AdminToken: "test-admin-token", SecretKey: "codex-app-image-secret", ImageStorageDir: t.TempDir(),
@@ -1111,8 +1103,8 @@ func TestCodexImageRequestUsesSubscriptionCompatibleResponse(t *testing.T) {
 			if err != nil || !bytes.Equal(decoded, imageBytes) {
 				t.Fatalf("Codex image response contains invalid image data: err=%v bytes=%d", err, len(decoded))
 			}
-			if selectedJob.Model != codexImageModelName || selectedRoute.Provider.Type != ProviderOpenAICodex ||
-				selectedRoute.Resource == nil || selectedRoute.Resource.ID != resource.ID {
+			if selectedJob.Model != openAIImageModelName || selectedRoute.Provider.Type != ProviderOpenAI ||
+				selectedRoute.Provider.ID != provider.ID {
 				t.Fatalf("Codex image request used the wrong route: job=%+v route=%+v", selectedJob, selectedRoute)
 			}
 		})
