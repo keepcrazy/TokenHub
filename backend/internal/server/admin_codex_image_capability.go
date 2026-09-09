@@ -331,6 +331,7 @@ func codexImageCapabilityRouteProfile() providerImageCapabilityRouteProfile {
 		RequestAliasModel:           openAIImageModelName,
 		RequestAliasHeader:          "x-codex-image-turn-id",
 		RequestAliasOriginator:      "codex",
+		RequestAliasPreserveModel:   true,
 		RequestAliasResponseFormat:  "b64_json",
 		RequestDefaultModel:         true,
 		RequestSupportsMask:         false,
