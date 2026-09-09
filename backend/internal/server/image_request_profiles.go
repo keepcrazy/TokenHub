@@ -29,7 +29,9 @@ func (s *Server) applyImageGenerationRequestAliases(r *http.Request, request *im
 		if !imageGenerationRequestAliasMatches(r, profile) {
 			continue
 		}
-		request.Model = profile.PublicModel
+		if !profile.RequestAliasPreserveModel {
+			request.Model = profile.PublicModel
+		}
 		if profile.RequestAliasResponseFormat != "" {
 			request.ResponseFormat = profile.RequestAliasResponseFormat
 		}
