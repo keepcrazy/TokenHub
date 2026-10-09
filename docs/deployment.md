@@ -28,6 +28,8 @@ The commands below use Docker Compose. Both backends are equally supported witho
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --remove-orphans
 ```
 
+The default SQLite Compose file limits the combined backend and frontend container to 4 GiB of memory with no swap. Adjust `mem_limit` and `memswap_limit` together for the host's capacity. Reaching the limit can trigger an OOM kill and a temporary service interruption; the existing `unless-stopped` policy restarts the container when it exits.
+
 ### PostgreSQL (Production Recommended)
 
 **Advantages:**

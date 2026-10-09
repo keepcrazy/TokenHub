@@ -28,6 +28,8 @@ TokenHub 支持两种数据库后端：
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --remove-orphans
 ```
 
+默认 SQLite Compose 文件将前后端共用容器的内存限制为 4 GiB，并禁用 swap。请按主机容量同时调整 `mem_limit` 和 `memswap_limit`。达到上限可能触发 OOM 杀进程并造成短暂服务中断；容器退出后，现有 `unless-stopped` 策略会自动重启它。
+
 ### PostgreSQL（推荐用于生产）
 
 **优点：**

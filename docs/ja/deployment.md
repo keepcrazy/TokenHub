@@ -28,6 +28,8 @@ TokenHub は 2 種類のデータベースバックエンドをサポートし�
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --remove-orphans
 ```
 
+デフォルトの SQLite Compose ファイルは、バックエンドとフロントエンドを共有するコンテナのメモリを 4 GiB に制限し、swap を無効にします。ホストの容量に応じて `mem_limit` と `memswap_limit` を同時に調整してください。上限に達すると OOM によるプロセス終了と一時的なサービス中断が発生する可能性があります。コンテナが終了した場合、既存の `unless-stopped` ポリシーにより自動的に再起動します。
+
 ### PostgreSQL（本番環境推奨）
 
 **利点：**

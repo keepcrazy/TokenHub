@@ -8,6 +8,8 @@ services:
       args:
         GOPROXY: ${GOPROXY:-https://goproxy.cn,direct}
     restart: unless-stopped
+    mem_limit: 4g
+    memswap_limit: 4g
     environment:
       TOKENHUB_ENV: ${TOKENHUB_ENV:-prod}
       TOKENHUB_DEPLOYMENT_TYPE: container
